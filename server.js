@@ -22,14 +22,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Initialize API keys with validation
+if (!process.env.YOUTUBE_API_KEY || !process.env.GEMINI_API_KEY) {
+  console.error('❌ Error: Missing required API keys in .env file');
+  console.error('Please create a .env file with YOUTUBE_API_KEY and GEMINI_API_KEY');
+  process.exit(1);
+}
+
 // Initialize YouTube API client
 const youtube = google.youtube({
   version: 'v3',
-  auth: process.env.YOUTUBE_API_KEY || 'AIzaSyByJTXVpcVu5iOtDCgSfHXBj83lzuuZ_H8'
+  auth: process.env.YOUTUBE_API_KEY
 });
 
 // Initialize Gemini API key
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyD9i_6OYQ62741azcP5pPkil2bLuPSnkkU';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Helper function to analyze text with Gemini API for sentiment and toxicity
 async function analyzeWithGemini(texts, analysisPrompt = '') {
