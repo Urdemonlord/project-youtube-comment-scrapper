@@ -2,11 +2,34 @@ import express from 'express';
 import cors from 'cors';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  addModel,
+  listModels,
+  activateModel,
+  deleteModel,
+  getActiveModel,
+  MODELS_DIR,
+} from './modelManager.js';
 
 dotenv.config();
 
 const app = express();
 const port = 3000;
+
+const upload = multer({
+  dest: MODELS_DIR,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = ['.pkl', '.pt', '.h5', '.joblib'];
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error('Unsupported model format'));
+  },
+});
 
 // Middleware
 app.use(cors({
@@ -329,6 +352,38 @@ function createFallbackAnalysis(texts) {
 // Store analysis results temporarily
 const analysisCache = new Map();
 
+// ---- Model management endpoints ----
+app.get('/models', (req, res) => {
+  const userId = req.query.userId || 'default';
+  res.json({ models: listModels(userId) });
+});
+
+app.post('/models/upload', upload.single('model'), (req, res) => {
+  const userId = req.body.userId || 'default';
+  if (!req.file) return res.status(400).json({ error: 'File required' });
+  const uniqueName = `${uuidv4()}${path.extname(req.file.originalname)}`;
+  const destPath = path.join(MODELS_DIR, uniqueName);
+  fs.renameSync(req.file.path, destPath);
+  const model = addModel(userId, req.file.originalname, destPath);
+  console.log(`📥 Model uploaded by ${userId}: ${req.file.originalname}`);
+  res.json({ success: true, model });
+});
+
+app.post('/models/activate', (req, res) => {
+  const { userId = 'default', modelId } = req.body;
+  if (!modelId) return res.status(400).json({ error: 'modelId required' });
+  activateModel(modelId, userId);
+  console.log(`⚡ Model ${modelId} activated for ${userId}`);
+  res.json({ success: true });
+});
+
+app.delete('/models/:id', (req, res) => {
+  const userId = req.query.userId || 'default';
+  deleteModel(req.params.id, userId);
+  console.log(`🗑️ Model ${req.params.id} deleted for ${userId}`);
+  res.json({ success: true });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
@@ -343,7 +398,11 @@ app.post('/analyze-comments', async (req, res) => {
   const startTime = Date.now();
   
   try {
-    const { videoId, analysisPrompt = '' } = req.body;
+    const { videoId, analysisPrompt = '', userId = 'default' } = req.body;
+    const activeModel = getActiveModel(userId);
+    if (activeModel) {
+      console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
+    }
     console.log(`🎬 Starting analysis for video: ${videoId}`);
 
     if (!videoId) {
