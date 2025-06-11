@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+model-db.sqlite
+user_models/
 
 # Editor directories and files
 .vscode/*

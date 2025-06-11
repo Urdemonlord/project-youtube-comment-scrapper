@@ -106,6 +106,10 @@ Sistem ini menghasilkan berbagai analisis:
 - Visualisasi data interaktif
 - Export data untuk analisis lanjut
 
+### 🚀 Custom Model Upload
+
+Pengguna kini dapat mengunggah model AI pribadi melalui dashboard. Setelah diunggah, model dapat diaktifkan atau dihapus sesuai kebutuhan. Sistem akan menggunakan model aktif milik pengguna saat melakukan prediksi.
+
 ## 📝 Lisensi
 
 MIT License
