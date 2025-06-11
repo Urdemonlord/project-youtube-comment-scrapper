@@ -34,22 +34,28 @@ const ToxicityChart: React.FC<ToxicityChartProps> = ({ toxicity }) => {
       </motion.div>
     );
   }
-
   // Provide default values to prevent destructuring errors
   const {
-    distribution = [],
+    distribution = { low: 0, medium: 0, high: 0 },
     averageScore = 0,
     totalToxicComments = 0,
     totalComments = 0,
     categoryCounts = {}
   } = toxicity || {};
 
+  // Convert distribution object to array for chart
+  const distributionData = [
+    { level: 'low', count: distribution.low },
+    { level: 'medium', count: distribution.medium },
+    { level: 'high', count: distribution.high }
+  ];
+
   // Prepare category data for visualization
   const categoryData = Object.entries(categoryCounts).map(([category, count]) => ({
     category: category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    count,
-    percentage: (count / totalComments) * 100
-  })).sort((a, b) => b.count - a.count);
+    count: count as number,
+    percentage: totalComments > 0 ? ((count as number) / totalComments) * 100 : 0
+  })).sort((a, b) => (b.count as number) - (a.count as number));
 
   const getToxicityLevelColor = (level: string) => {
     return TOXICITY_COLORS[level as keyof typeof TOXICITY_COLORS] || '#a3a3a3';
@@ -116,10 +122,9 @@ const ToxicityChart: React.FC<ToxicityChartProps> = ({ toxicity }) => {
 
       {/* Distribution Chart */}
       <div className="mb-6">
-        <h4 className="text-md font-medium text-gray-700 mb-3">Toxicity Level Distribution</h4>
-        <div className="h-48">
+        <h4 className="text-md font-medium text-gray-700 mb-3">Toxicity Level Distribution</h4>        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={distribution}>
+            <BarChart data={distributionData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="level"
@@ -131,7 +136,7 @@ const ToxicityChart: React.FC<ToxicityChartProps> = ({ toxicity }) => {
                 labelFormatter={(label) => `${label.charAt(0).toUpperCase() + label.slice(1)} Toxicity`}
               />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {distribution.map((entry, index) => (
+                {distributionData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={getToxicityLevelColor(entry.level)} />
                 ))}
               </Bar>

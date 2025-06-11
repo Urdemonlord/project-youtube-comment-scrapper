@@ -29,6 +29,20 @@ if (!process.env.YOUTUBE_API_KEY || !process.env.GEMINI_API_KEY) {
   process.exit(1);
 }
 
+// Debug: Show first 10 characters of API keys for troubleshooting
+console.log(`🔑 YouTube API Key: ${process.env.YOUTUBE_API_KEY.substring(0, 10)}...`);
+console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY.substring(0, 10)}...`);
+
+// ⚠️  WARNING: Check if using compromised keys
+const COMPROMISED_KEY_PREFIX = 'AIzaSyCHzP';
+if (process.env.YOUTUBE_API_KEY.startsWith(COMPROMISED_KEY_PREFIX)) {
+  console.error('🚨 WARNING: You are using a COMPROMISED API key!');
+  console.error('🚨 This key was previously exposed in public code and may be disabled.');
+  console.error('🚨 Please generate NEW API keys immediately!');
+  console.error('🚨 YouTube API: https://console.cloud.google.com/apis/credentials');
+  console.error('🚨 Gemini API: https://makersuite.google.com/app/apikey');
+}
+
 // Initialize YouTube API client
 const youtube = google.youtube({
   version: 'v3',
