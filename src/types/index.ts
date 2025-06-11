@@ -8,6 +8,15 @@ export interface ToxicityAnalysis {
   insult: number;
   identity_attack: number;
   sexual_explicit: number;
+  categories: {
+    identity_attack: number;
+    insult: number;
+    obscene: number;
+    severe_toxicity: number;
+    sexual_explicit: number;
+    threat: number;
+  };
+  confidence: number;
 }
 
 export interface SentimentAnalysis {
@@ -21,6 +30,8 @@ export interface TopicAnalysis {
   topic: string;
   weight: number;
   keywords: string[];
+  count: number;
+  sentiment: number;
 }
 
 export interface KeywordAnalysis {
@@ -37,6 +48,16 @@ export interface ToxicityOverall {
     high: number;
   };
   flaggedComments: number;
+  totalToxicComments: number;
+  totalComments: number;
+  categoryCounts: {
+    identity_attack: number;
+    insult: number;
+    obscene: number;
+    severe_toxicity: number;
+    sexual_explicit: number;
+    threat: number;
+  };
 }
 
 export interface EngagementAnalysis {
@@ -206,4 +227,277 @@ export interface ExportSettings {
   template: string;
   autoSchedule: boolean;
   scheduleFrequency?: 'daily' | 'weekly' | 'monthly';
+}
+
+// Notification system
+export interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  message: string;
+  title?: string;
+  timestamp: Date;
+  read?: boolean;
+  actions?: Array<{
+    label: string;
+    action: () => void;
+    variant?: 'primary' | 'secondary' | 'danger';
+  }>;
+}
+
+// Export functionality
+export interface ExportFormat {
+  type: 'xlsx' | 'csv' | 'json' | 'pdf';
+  label: string;
+  mimeType: string;
+}
+
+export interface ExportOptions {
+  format: ExportFormat;
+  includeCharts: boolean;
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
+  filters?: {
+    sentiment?: string[];
+    toxicity?: string[];
+    authors?: string[];
+  };
+}
+
+// Chart data interfaces
+export interface ChartData {
+  labels: string[];
+  datasets: ChartDataset[];
+}
+
+export interface ChartDataset {
+  label: string;
+  data: number[];
+  backgroundColor?: string | string[];
+  borderColor?: string | string[];
+  borderWidth?: number;
+}
+
+// Settings configuration
+export interface SettingsSection {
+  id: string;
+  title: string;
+  description?: string;
+  settings: SettingsItem[];
+}
+
+export interface SettingsItem {
+  id: string;
+  label: string;
+  description?: string;
+  type: 'text' | 'number' | 'boolean' | 'select' | 'multiselect' | 'range';
+  value?: string | number | boolean;
+  defaultValue?: string | number | boolean;
+  options?: SettingsOption[];
+  validation?: {
+    required?: boolean;
+    min?: number;
+    max?: number;
+    pattern?: string;
+  };
+  transform?: (value: string | number | boolean) => string | number | boolean;
+}
+
+export interface SettingsOption {
+  label: string;
+  value: string | number | boolean;
+  description?: string;
+}
+
+// Configuration interfaces
+export interface AppConfig {
+  version: string;
+  buildDate: string;
+  features: {
+    enableUserManagement: boolean;
+    enableExport: boolean;
+    enableNotifications: boolean;
+    enableThemes: boolean;
+  };
+  limits: {
+    maxCommentsPerSession: number;
+    maxConcurrentSessions: number;
+    maxStoredSessions: number;
+  };
+  api: {
+    baseUrl: string;
+    timeout: number;
+    retryAttempts: number;
+  };
+  ui: {
+    defaultTheme: string;
+    availableLanguages: string[];
+    dateFormat: string;
+  };
+}
+
+export interface GlobalSettings {
+  app: AppConfig;
+  user: UserPreferences;
+  analysis: AnalysisSettings;
+  export: ExportSettings;
+  notifications: NotificationSettings;
+}
+
+// Store related interfaces
+export interface AppState {
+  // Sessions
+  sessions: ScrapingSession[];
+  currentSessionId: string | null;
+  
+  // Analysis
+  currentAnalysis: AnalysisResult | null;
+  isAnalyzing: boolean;
+  
+  // Comments and filtering
+  comments: Comment[];
+  filteredComments: Comment[];
+  filters: {
+    search: string;
+    sentiment: string[];
+    toxicity: string[];
+    dateRange: {
+      start: Date | null;
+      end: Date | null;
+    };
+  };
+  
+  // UI state
+  activeTab: string;
+  loading: boolean;
+  notifications: Notification[];
+  
+  // Settings
+  settings: Record<string, string | number | boolean>;
+  
+  // Pagination and sorting
+  sortBy: string;
+  pagination: {
+    currentPage: number;
+    itemsPerPage: number;
+    totalItems: number;
+  };
+  
+  // Actions
+  setActiveTab: (tab: string) => void;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
+  setLoading: (loading: boolean) => void;
+  setSessions: (sessions: ScrapingSession[]) => void;
+  addSession: (session: ScrapingSession) => void;
+  updateSession: (id: string, updates: Partial<ScrapingSession>) => void;
+  removeSession: (id: string) => void;
+  setCurrentSessionId: (id: string | null) => void;
+  setComments: (comments: Comment[]) => void;
+  setFilteredComments: (comments: Comment[]) => void;
+  updateFilters: (filters: Partial<AppState['filters']>) => void;
+  clearFilters: () => void;
+  updateSettings: (settings: Record<string, string | number | boolean>) => void;
+  setSortBy: (sortBy: string) => void;
+  updatePagination: (pagination: Partial<AppState['pagination']>) => void;
+  
+  // New actions for enhanced features
+  createSession: (session: Omit<ScrapingSession, 'id' | 'createdAt'>) => string;
+  updateScrapingProgress: (sessionId: string, progress: Partial<{
+    status: ScrapingSession['status'];
+    completedAt: Date;
+    error: string;
+    result: AnalysisResult;
+  }>) => void;
+}
+
+// API related interfaces
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  errors?: string[];
+}
+
+export interface AnalysisRequest {
+  videoId: string;
+  videoUrl?: string;
+  analysisPrompt?: string;
+  maxComments?: number;
+  includeReplies?: boolean;
+  settings?: AnalysisSettings;
+}
+
+export interface ApiError {
+  message: string;
+  code?: string;
+  status?: number;
+  details?: unknown;
+}
+
+// Props interfaces for components
+export interface TabProps {
+  className?: string;
+}
+
+export interface StatisticCardProps {
+  title: string;
+  value: string | number;
+  change?: {
+    value: number;
+    type: 'increase' | 'decrease';
+  };
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+export interface TrendChartProps {
+  data: ChartData;
+  type?: 'line' | 'bar' | 'area';
+  height?: number;
+}
+
+export interface ActivityFeedProps {
+  activities: Array<{
+    id: string;
+    type: string;
+    message: string;
+    timestamp: Date;
+    user?: string;
+  }>;
+}
+
+export interface CommentCardProps {
+  comment: Comment;
+  onSelect?: (selected: boolean) => void;
+  selected?: boolean;
+  showActions?: boolean;
+}
+
+export interface FilterPanelProps {
+  filters: AppState['filters'];
+  onFiltersChange: (filters: Partial<AppState['filters']>) => void;
+  onClearFilters: () => void;
+}
+
+export interface PaginationControlsProps {
+  currentPage: number;
+  totalPages: number;
+  itemsPerPage: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+  onItemsPerPageChange: (itemsPerPage: number) => void;
+}
+
+// Progress tracking interface
+export interface ScrapingProgress {
+  sessionId: string;
+  status: 'initializing' | 'scraping' | 'processing' | 'analyzing' | 'completed' | 'error';
+  progress: number; // 0-100
+  currentStep: string;
+  commentsScraped: number;
+  totalComments?: number;
+  estimatedTimeRemaining?: number;
+  error?: string;
 }
