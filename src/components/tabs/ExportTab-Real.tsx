@@ -58,7 +58,8 @@ const formatDateTime = (date: Date | string | number | null | undefined): string
       return 'Invalid Date';
     }
     
-    return dateObj.toLocaleString();  } catch {
+    return dateObj.toLocaleString();
+  } catch {
     return 'Date Error';
   }
 };
