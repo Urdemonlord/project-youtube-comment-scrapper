@@ -14,8 +14,6 @@ import {
   getActiveModel,
   MODELS_DIR,
 } from './modelManager.js';
-import { analyzeWithIndoBert } from './indoBertAnalyzer.js';
-import { fetchComments } from './youtubeFetcher.js';
 
 dotenv.config();
 
@@ -107,18 +105,20 @@ function parseJsonSafe(str) {
       .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
       .replace(/[\u0000-\u001F\u007F-\u009F]+/g, '') // remove control chars
   );
-
   for (const attempt of attempts) {
     try {
       return JSON.parse(attempt);
-    } catch {}
+    } catch (error) {
+      // Continue to next attempt
+    }
   }
 
   for (const attempt of attempts) {
     try {
-      // eslint-disable-next-line no-new-func
       return Function('return (' + attempt + ')')();
-    } catch {}
+    } catch (error) {
+      // Continue to next attempt
+    }
   }
 
   throw new Error('Unable to parse JSON');
@@ -302,14 +302,16 @@ ${batchText}
           const delay = attempt * 2000;
           console.log(`⏳ Retrying in ${delay/1000} seconds...`);
           await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      } else {
+        }      } else {
         // After all retries failed, return fallback analysis
         console.warn('⚠️ All Gemini retries failed, using fallback analysis...');
         return createFallbackAnalysis(texts);
       }
     }
   }
+  
+  // This should never be reached, but just in case
+  return createFallbackAnalysis(texts);
 }
 
 // Fallback analysis function when Gemini API fails
@@ -397,7 +399,6 @@ function createFallbackAnalysis(texts) {
   };
 }
 
-
 // Store analysis results temporarily
 const analysisCache = new Map();
 
@@ -445,22 +446,14 @@ app.get('/health', (req, res) => {
 // Endpoint to analyze YouTube comments
 app.post('/analyze-comments', async (req, res) => {
   const startTime = Date.now();
-
+  
   try {
-  const {
-    videoId,
-    analysisPrompt = "",
-    userId = "default",
-    maxComments = 100,
-    analysisMethod = "gemini",
-    includeReplies = false,
-    sortBy = "top"
-  } = req.body;
-  const activeModel = getActiveModel(userId);
-  if (activeModel) {
-    console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
-  }
-  console.log(`🎬 Starting analysis for video: ${videoId}`);
+    const { videoId, analysisPrompt = '', userId = 'default' } = req.body;
+    const activeModel = getActiveModel(userId);
+    if (activeModel) {
+      console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
+    }
+    console.log(`🎬 Starting analysis for video: ${videoId}`);
 
     if (!videoId) {
       return res.status(400).json({ 
@@ -492,7 +485,20 @@ app.post('/analyze-comments', async (req, res) => {
     
     // Fetch comments
     console.log('💬 Fetching comments...');
-    const comments = await fetchComments(videoId, maxComments, includeReplies, sortBy);
+    const commentsResponse = await youtube.commentThreads.list({
+      part: ['snippet'],
+      videoId: videoId,
+      maxResults: 20  // Reduced for better performance
+    });
+
+    const comments = commentsResponse.data.items.map(item => ({
+      id: item.id,
+      text: item.snippet.topLevelComment.snippet.textDisplay,
+      author: item.snippet.topLevelComment.snippet.authorDisplayName,
+      publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
+      likeCount: item.snippet.topLevelComment.snippet.likeCount,
+      replyCount: item.snippet.totalReplyCount
+    }));
 
     console.log(`💬 Fetched ${comments.length} comments`);
 
@@ -511,14 +517,9 @@ app.post('/analyze-comments', async (req, res) => {
     let usingFallback = false;
     
     try {
-    try {
-      if (analysisMethod === "indobert") {
-        analysisResult = await analyzeWithIndoBert(texts);
-      } else {
-        analysisResult = await analyzeWithGemini(texts, analysisPrompt);
-      }
+      analysisResult = await analyzeWithGemini(texts, analysisPrompt);
     } catch (error) {
-      console.warn("⚠️ Gemini analysis completely failed, using fallback...");
+      console.warn('⚠️ Gemini analysis completely failed, using fallback...');
       analysisResult = createFallbackAnalysis(texts);
       usingFallback = true;
     }
@@ -577,9 +578,10 @@ app.post('/analyze-comments', async (req, res) => {
       },
       timestamp: new Date().toISOString(),
       metadata: {
-        analysisMethod: usingFallback ? "keyword-based" : (analysisMethod === "indobert" ? "indobert" : "gemini-2.0-flash"),
-        processingTime: ((Date.now() - startTime) / 1000).toFixed(2) + "s",
-        modelVersion: usingFallback ? "fallback-v1" : (analysisMethod === "indobert" ? "indobert-base-p1" : "gemini-2.0-flash-exp")
+        usingFallback,
+        analysisMethod: usingFallback ? 'keyword-based' : 'gemini-2.0-flash',
+        processingTime: ((Date.now() - startTime) / 1000).toFixed(2) + 's',
+        modelVersion: usingFallback ? 'fallback-v1' : 'gemini-2.0-flash-exp'
       }
     };
 
