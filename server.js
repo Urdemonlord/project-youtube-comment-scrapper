@@ -397,28 +397,43 @@ function createFallbackAnalysis(texts) {
 }
 
 // Fetch comments with optional pagination
-async function fetchComments(videoId, maxComments = 100) {
+async function fetchComments(videoId, maxComments = 100, includeReplies = false) {
   const comments = [];
   let pageToken;
 
   while (comments.length < maxComments) {
     const response = await youtube.commentThreads.list({
-      part: ['snippet'],
+      part: includeReplies ? ['snippet', 'replies'] : ['snippet'],
       videoId,
       maxResults: Math.min(100, maxComments - comments.length),
       pageToken
     });
 
-    comments.push(
-      ...response.data.items.map(item => ({
+    for (const item of response.data.items) {
+      if (comments.length >= maxComments) break;
+      const top = item.snippet.topLevelComment.snippet;
+      comments.push({
         id: item.id,
-        text: item.snippet.topLevelComment.snippet.textDisplay,
-        author: item.snippet.topLevelComment.snippet.authorDisplayName,
-        publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-        likeCount: item.snippet.topLevelComment.snippet.likeCount,
+        text: top.textDisplay,
+        author: top.authorDisplayName,
+        publishedAt: top.publishedAt,
+        likeCount: top.likeCount,
         replyCount: item.snippet.totalReplyCount
-      }))
-    );
+      });
+      if (includeReplies && item.replies && item.replies.comments) {
+        for (const reply of item.replies.comments) {
+          if (comments.length >= maxComments) break;
+          comments.push({
+            id: reply.id,
+            text: reply.snippet.textDisplay,
+            author: reply.snippet.authorDisplayName,
+            publishedAt: reply.snippet.publishedAt,
+            likeCount: reply.snippet.likeCount,
+            replyCount: 0
+          });
+        }
+      }
+    }
 
     pageToken = response.data.nextPageToken;
     if (!pageToken) break;
@@ -481,7 +496,8 @@ app.post('/analyze-comments', async (req, res) => {
     analysisPrompt = "",
     userId = "default",
     maxComments = 100,
-    analysisMethod = "gemini"
+    analysisMethod = "gemini",
+    includeReplies = false
   } = req.body;
   const activeModel = getActiveModel(userId);
   if (activeModel) {
@@ -519,7 +535,7 @@ app.post('/analyze-comments', async (req, res) => {
     
     // Fetch comments
     console.log('💬 Fetching comments...');
-    const comments = await fetchComments(videoId, maxComments);
+    const comments = await fetchComments(videoId, maxComments, includeReplies);
 
     console.log(`💬 Fetched ${comments.length} comments`);
 

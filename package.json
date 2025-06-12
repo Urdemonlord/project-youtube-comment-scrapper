@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "server": "node server.js",
     "test-model": "node tests/modelUpload.test.js",
-    "test": "node tests/textClassifier.test.js && node tests/indoBertAnalyzer.test.js"
+    "test": "node tests/textClassifier.test.js && node tests/indoBertAnalyzer.test.js && node tests/fetchCommentsReplies.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
