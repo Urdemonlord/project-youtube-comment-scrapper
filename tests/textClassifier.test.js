@@ -21,6 +21,14 @@ const cases = [
   {
     comment: 'Subscribe channel saya di http://example.com',
     expected: 'Spam/Tidak Relevan'
+  },
+  {
+    comment: 'Kamu bego banget',
+    expected: 'Penghinaan'
+  },
+  {
+    comment: 'Dasar monyet kalian',
+    expected: 'Ujaran Kebencian'
   }
 ];
 

@@ -13,4 +13,11 @@ Dokumen ini merangkum definisi kategori yang digunakan untuk mengklasifikasikan 
 5. **Spam/Tidak Relevan**
    - Komentar promosi atau di luar topik pembahasan.
 
-File `src/utils/textClassifier.js` berisi fungsi sederhana `classifyComment()` yang melakukan klasifikasi berbasis kata kunci.
+File `src/utils/textClassifier.js` berisi fungsi sederhana `classifyComment()`
+yang melakukan klasifikasi berbasis kata kunci. Daftar kata kunci saat ini:
+
+- **Penghinaan:** `bodoh`, `goblok`, `idiot`, `tolol`, `bego`, `dungu`
+- **Ujaran Kebencian:** `kafir`, `aseng`, `babi`, `anjing`, `monyet`
+
+Kata kunci dapat diperluas sesuai kebutuhan untuk meningkatkan akurasi
+pendeteksian komentar bernada negatif.
