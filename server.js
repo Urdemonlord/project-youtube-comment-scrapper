@@ -79,20 +79,47 @@ const youtube = google.youtube({
 // Initialize Gemini API key
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Safely parse JSON and try to remove common issues like trailing commas
-function parseJsonSafe(str) {
-  try {
-    return JSON.parse(str);
-  } catch (err) {
-    try {
-      const cleaned = str
-        .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
-        .replace(/[\u0000-\u001F]+/g, ''); // remove control chars
-      return JSON.parse(cleaned);
-    } catch (err2) {
-      throw err;
+// Extracts the first balanced JSON object from a string
+function extractBalancedJson(str) {
+  const start = str.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < str.length; i++) {
+    const char = str[i];
+    if (char === '{') depth++;
+    if (char === '}') {
+      depth--;
+      if (depth === 0) return str.slice(start, i + 1);
     }
   }
+  return null;
+}
+
+// Safely parse JSON with cleanup and fallback evaluation
+function parseJsonSafe(str) {
+  const attempts = [];
+  attempts.push(str);
+  attempts.push(
+    str
+      .replace(/```(?:json)?/gi, '') // strip code fences
+      .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
+      .replace(/[\u0000-\u001F\u007F-\u009F]+/g, '') // remove control chars
+  );
+
+  for (const attempt of attempts) {
+    try {
+      return JSON.parse(attempt);
+    } catch {}
+  }
+
+  for (const attempt of attempts) {
+    try {
+      // eslint-disable-next-line no-new-func
+      return Function('return (' + attempt + ')')();
+    } catch {}
+  }
+
+  throw new Error('Unable to parse JSON');
 }
 
 // Helper function to analyze text with Gemini API for sentiment and toxicity
@@ -224,10 +251,9 @@ ${batchText}
             .replace(/<[^>]*>/g, '') // Remove remaining HTML tags
             .replace(/http[s]?:\/\/[^\s]*/g, '[URL]'); // Replace URLs
 
-          // Try to extract JSON
-          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const jsonStr = jsonMatch[0].trim();
+          // Try to extract JSON using balanced braces
+          const jsonStr = extractBalancedJson(cleanText);
+          if (jsonStr) {
             console.log('🔍 Cleaned JSON:', jsonStr.substring(0, 200) + '...');
             
             const parsedData = parseJsonSafe(jsonStr);
