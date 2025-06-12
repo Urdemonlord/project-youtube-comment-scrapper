@@ -79,6 +79,22 @@ const youtube = google.youtube({
 // Initialize Gemini API key
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+// Safely parse JSON and try to remove common issues like trailing commas
+function parseJsonSafe(str) {
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    try {
+      const cleaned = str
+        .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
+        .replace(/[\u0000-\u001F]+/g, ''); // remove control chars
+      return JSON.parse(cleaned);
+    } catch (err2) {
+      throw err;
+    }
+  }
+}
+
 // Helper function to analyze text with Gemini API for sentiment and toxicity
 async function analyzeWithGemini(texts, analysisPrompt = '') {
   const maxRetries = 3;
@@ -214,7 +230,7 @@ ${batchText}
             const jsonStr = jsonMatch[0].trim();
             console.log('🔍 Cleaned JSON:', jsonStr.substring(0, 200) + '...');
             
-            const parsedData = JSON.parse(jsonStr);
+            const parsedData = parseJsonSafe(jsonStr);
             
             // Validate required fields
             if (!parsedData.comments || !Array.isArray(parsedData.comments)) {
