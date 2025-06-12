@@ -62,7 +62,11 @@ const ModelUploadWidget: React.FC = () => {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Custom Models</h3>
       <div className="flex items-center space-x-2">
-        <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} className="flex-1" />
+        <input
+          type="file"
+          onChange={e => setFile(e.target.files?.[0] || null)}
+          className="flex-grow px-2 py-1 text-sm border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+        />
         <button onClick={handleUpload} className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1">
           <Upload className="h-4 w-4" /> <span>Upload</span>
         </button>
