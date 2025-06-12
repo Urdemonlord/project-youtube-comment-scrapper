@@ -14,6 +14,7 @@ import {
   getActiveModel,
   MODELS_DIR,
 } from './modelManager.js';
+import { analyzeWithIndoBert } from './indoBertAnalyzer.js';
 
 dotenv.config();
 
@@ -475,17 +476,18 @@ app.post('/analyze-comments', async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const {
-      videoId,
-      analysisPrompt = '',
-      userId = 'default',
-      maxComments = 100
-    } = req.body;
-    const activeModel = getActiveModel(userId);
-    if (activeModel) {
-      console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
-    }
-    console.log(`🎬 Starting analysis for video: ${videoId}`);
+  const {
+    videoId,
+    analysisPrompt = "",
+    userId = "default",
+    maxComments = 100,
+    analysisMethod = "gemini"
+  } = req.body;
+  const activeModel = getActiveModel(userId);
+  if (activeModel) {
+    console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
+  }
+  console.log(`🎬 Starting analysis for video: ${videoId}`);
 
     if (!videoId) {
       return res.status(400).json({ 
@@ -536,9 +538,14 @@ app.post('/analyze-comments', async (req, res) => {
     let usingFallback = false;
     
     try {
-      analysisResult = await analyzeWithGemini(texts, analysisPrompt);
+    try {
+      if (analysisMethod === "indobert") {
+        analysisResult = await analyzeWithIndoBert(texts);
+      } else {
+        analysisResult = await analyzeWithGemini(texts, analysisPrompt);
+      }
     } catch (error) {
-      console.warn('⚠️ Gemini analysis completely failed, using fallback...');
+      console.warn("⚠️ Gemini analysis completely failed, using fallback...");
       analysisResult = createFallbackAnalysis(texts);
       usingFallback = true;
     }
@@ -597,10 +604,9 @@ app.post('/analyze-comments', async (req, res) => {
       },
       timestamp: new Date().toISOString(),
       metadata: {
-        usingFallback,
-        analysisMethod: usingFallback ? 'keyword-based' : 'gemini-2.0-flash',
-        processingTime: ((Date.now() - startTime) / 1000).toFixed(2) + 's',
-        modelVersion: usingFallback ? 'fallback-v1' : 'gemini-2.0-flash-exp'
+        analysisMethod: usingFallback ? "keyword-based" : (analysisMethod === "indobert" ? "indobert" : "gemini-2.0-flash"),
+        processingTime: ((Date.now() - startTime) / 1000).toFixed(2) + "s",
+        modelVersion: usingFallback ? "fallback-v1" : (analysisMethod === "indobert" ? "indobert-base-p1" : "gemini-2.0-flash-exp")
       }
     };
 
