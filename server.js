@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { google } from 'googleapis';
+import { youtube, fetchComments } from './youtubeFetcher.js';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -71,11 +71,7 @@ if (process.env.YOUTUBE_API_KEY.startsWith(COMPROMISED_KEY_PREFIX)) {
   console.error('🚨 Gemini API: https://makersuite.google.com/app/apikey');
 }
 
-// Initialize YouTube API client
-const youtube = google.youtube({
-  version: 'v3',
-  auth: process.env.YOUTUBE_API_KEY
-});
+// youtube client and fetchComments are provided by youtubeFetcher.js
 
 // Initialize Gemini API key
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -396,36 +392,6 @@ function createFallbackAnalysis(texts) {
   };
 }
 
-// Fetch comments with optional pagination
-async function fetchComments(videoId, maxComments = 100) {
-  const comments = [];
-  let pageToken;
-
-  while (comments.length < maxComments) {
-    const response = await youtube.commentThreads.list({
-      part: ['snippet'],
-      videoId,
-      maxResults: Math.min(100, maxComments - comments.length),
-      pageToken
-    });
-
-    comments.push(
-      ...response.data.items.map(item => ({
-        id: item.id,
-        text: item.snippet.topLevelComment.snippet.textDisplay,
-        author: item.snippet.topLevelComment.snippet.authorDisplayName,
-        publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-        likeCount: item.snippet.topLevelComment.snippet.likeCount,
-        replyCount: item.snippet.totalReplyCount
-      }))
-    );
-
-    pageToken = response.data.nextPageToken;
-    if (!pageToken) break;
-  }
-
-  return comments;
-}
 
 // Store analysis results temporarily
 const analysisCache = new Map();
@@ -481,7 +447,8 @@ app.post('/analyze-comments', async (req, res) => {
     analysisPrompt = "",
     userId = "default",
     maxComments = 100,
-    analysisMethod = "gemini"
+    analysisMethod = "gemini",
+    sortBy = "relevance"
   } = req.body;
   const activeModel = getActiveModel(userId);
   if (activeModel) {
@@ -519,7 +486,7 @@ app.post('/analyze-comments', async (req, res) => {
     
     // Fetch comments
     console.log('💬 Fetching comments...');
-    const comments = await fetchComments(videoId, maxComments);
+    const comments = await fetchComments(videoId, maxComments, sortBy);
 
     console.log(`💬 Fetched ${comments.length} comments`);
 

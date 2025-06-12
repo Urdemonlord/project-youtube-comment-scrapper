@@ -109,6 +109,13 @@ Sistem ini menghasilkan berbagai analisis:
 ### 🔤 Mode IndoBERT
 Aktifkan analisis IndoBERT dengan mengirim parameter `analysisMethod: "indobert"` pada endpoint `/analyze-comments`. Pastikan paket `@xenova/transformers` telah terpasang.
 
+### 🔽 Menentukan Urutan Komentar
+Kirim parameter `sortBy` saat memanggil endpoint `/analyze-comments` untuk mengatur urutan komentar yang diambil. Nilai yang didukung:
+
+- `relevance` *(default)* - komentar paling relevan terlebih dahulu
+- `time` - komentar terbaru terlebih dahulu
+- `rating` - komentar dengan peringkat tertinggi terlebih dahulu
+
 Pengguna kini dapat mengunggah model AI pribadi melalui tab Analyze. Setelah diunggah, model dapat diaktifkan atau dihapus sesuai kebutuhan. Sistem akan menggunakan model aktif milik pengguna saat melakukan prediksi.
 
 ## 🤝 Kontribusi
