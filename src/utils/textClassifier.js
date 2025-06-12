@@ -25,7 +25,13 @@ export function classifyComment(text) {
   }
 
   // Hate speech (very naive check)
-  const hateWords = [/\bkafir\b/, /\baseng\b/, /\bbabi\b/];
+  const hateWords = [
+    /\bkafir\b/,
+    /\baseng\b/,
+    /\bbabi\b/,
+    /\banjing\b/,
+    /\bmonyet\b/
+  ];
   if (hateWords.some((r) => r.test(lower))) {
     return {
       klasifikasi: 'Ujaran Kebencian',
@@ -34,7 +40,14 @@ export function classifyComment(text) {
   }
 
   // Direct insult
-  const insults = [/\bbodoh\b/, /\bgoblok\b/, /\bidiot\b/, /\btolol\b/];
+  const insults = [
+    /\bbodoh\b/,
+    /\bgoblok\b/,
+    /\bidiot\b/,
+    /\btolol\b/,
+    /\bbego\b/,
+    /\bdungu\b/
+  ];
   if (insults.some((r) => r.test(lower))) {
     return { klasifikasi: 'Penghinaan', alasan: 'Komentar menyerang individu.' };
   }
