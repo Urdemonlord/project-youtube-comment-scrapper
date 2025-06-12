@@ -69,8 +69,8 @@ cd project-youtube-comment-scrapper
 2. Install dependencies:
 ```bash
 npm install
+npm install @xenova/transformers # diperlukan untuk analisis IndoBERT
 ```
-
 3. Konfigurasi environment:
 ```bash
 cp .env.example .env
@@ -87,7 +87,6 @@ npm run server
 # Terminal 2: Frontend
 npm run dev
 ```
-
 ## 🔒 Keamanan API
 
 1. Jangan pernah commit file .env
@@ -107,6 +106,8 @@ Sistem ini menghasilkan berbagai analisis:
 - Export data untuk analisis lanjut
 
 ### 🚀 Custom Model Upload
+### 🔤 Mode IndoBERT
+Aktifkan analisis IndoBERT dengan mengirim parameter `analysisMethod: "indobert"` pada endpoint `/analyze-comments`. Pastikan paket `@xenova/transformers` telah terpasang.
 
 Pengguna kini dapat mengunggah model AI pribadi melalui tab Analyze. Setelah diunggah, model dapat diaktifkan atau dihapus sesuai kebutuhan. Sistem akan menggunakan model aktif milik pengguna saat melakukan prediksi.
 
