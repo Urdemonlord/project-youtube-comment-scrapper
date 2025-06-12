@@ -395,6 +395,37 @@ function createFallbackAnalysis(texts) {
   };
 }
 
+// Fetch comments with optional pagination
+async function fetchComments(videoId, maxComments = 100) {
+  const comments = [];
+  let pageToken;
+
+  while (comments.length < maxComments) {
+    const response = await youtube.commentThreads.list({
+      part: ['snippet'],
+      videoId,
+      maxResults: Math.min(100, maxComments - comments.length),
+      pageToken
+    });
+
+    comments.push(
+      ...response.data.items.map(item => ({
+        id: item.id,
+        text: item.snippet.topLevelComment.snippet.textDisplay,
+        author: item.snippet.topLevelComment.snippet.authorDisplayName,
+        publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
+        likeCount: item.snippet.topLevelComment.snippet.likeCount,
+        replyCount: item.snippet.totalReplyCount
+      }))
+    );
+
+    pageToken = response.data.nextPageToken;
+    if (!pageToken) break;
+  }
+
+  return comments;
+}
+
 // Store analysis results temporarily
 const analysisCache = new Map();
 
@@ -442,9 +473,14 @@ app.get('/health', (req, res) => {
 // Endpoint to analyze YouTube comments
 app.post('/analyze-comments', async (req, res) => {
   const startTime = Date.now();
-  
+
   try {
-    const { videoId, analysisPrompt = '', userId = 'default' } = req.body;
+    const {
+      videoId,
+      analysisPrompt = '',
+      userId = 'default',
+      maxComments = 100
+    } = req.body;
     const activeModel = getActiveModel(userId);
     if (activeModel) {
       console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
@@ -481,20 +517,7 @@ app.post('/analyze-comments', async (req, res) => {
     
     // Fetch comments
     console.log('💬 Fetching comments...');
-    const commentsResponse = await youtube.commentThreads.list({
-      part: ['snippet'],
-      videoId: videoId,
-      maxResults: 20  // Reduced for better performance
-    });
-
-    const comments = commentsResponse.data.items.map(item => ({
-      id: item.id,
-      text: item.snippet.topLevelComment.snippet.textDisplay,
-      author: item.snippet.topLevelComment.snippet.authorDisplayName,
-      publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-      likeCount: item.snippet.topLevelComment.snippet.likeCount,
-      replyCount: item.snippet.totalReplyCount
-    }));
+    const comments = await fetchComments(videoId, maxComments);
 
     console.log(`💬 Fetched ${comments.length} comments`);
 
