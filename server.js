@@ -92,8 +92,27 @@ function extractBalancedJson(text) {
   if (start === -1) return null;
 
   const stack = [];
+  let inString = false;
+  let escape = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
+
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
     if (ch === '{' || ch === '[') {
       stack.push(ch);
     } else if (ch === '}' || ch === ']') {
