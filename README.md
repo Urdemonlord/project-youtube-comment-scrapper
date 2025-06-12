@@ -111,6 +111,7 @@ Aktifkan analisis IndoBERT dengan mengirim parameter `analysisMethod: "indobert"
 
 ### API Usage
 Gunakan parameter `includeReplies` pada endpoint `/analyze-comments` untuk menyertakan balasan komentar. Nilai default adalah `false`. Jika diatur ke `true`, setiap reply akan dihitung sebagai komentar tersendiri hingga batas `maxComments` tercapai.
+Gunakan juga parameter `sortBy` untuk menentukan urutan komentar. Pilihan `top` (default) akan mengambil komentar terpopuler, sedangkan `new` mengambil komentar terbaru terlebih dahulu.
 
 Pengguna kini dapat mengunggah model AI pribadi melalui tab Analyze. Setelah diunggah, model dapat diaktifkan atau dihapus sesuai kebutuhan. Sistem akan menggunakan model aktif milik pengguna saat melakukan prediksi.
 

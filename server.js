@@ -15,6 +15,7 @@ import {
   MODELS_DIR,
 } from './modelManager.js';
 import { analyzeWithIndoBert } from './indoBertAnalyzer.js';
+import { fetchComments } from './youtubeFetcher.js';
 
 dotenv.config();
 
@@ -396,51 +397,6 @@ function createFallbackAnalysis(texts) {
   };
 }
 
-// Fetch comments with optional pagination
-async function fetchComments(videoId, maxComments = 100, includeReplies = false) {
-  const comments = [];
-  let pageToken;
-
-  while (comments.length < maxComments) {
-    const response = await youtube.commentThreads.list({
-      part: includeReplies ? ['snippet', 'replies'] : ['snippet'],
-      videoId,
-      maxResults: Math.min(100, maxComments - comments.length),
-      pageToken
-    });
-
-    for (const item of response.data.items) {
-      if (comments.length >= maxComments) break;
-      const top = item.snippet.topLevelComment.snippet;
-      comments.push({
-        id: item.id,
-        text: top.textDisplay,
-        author: top.authorDisplayName,
-        publishedAt: top.publishedAt,
-        likeCount: top.likeCount,
-        replyCount: item.snippet.totalReplyCount
-      });
-      if (includeReplies && item.replies && item.replies.comments) {
-        for (const reply of item.replies.comments) {
-          if (comments.length >= maxComments) break;
-          comments.push({
-            id: reply.id,
-            text: reply.snippet.textDisplay,
-            author: reply.snippet.authorDisplayName,
-            publishedAt: reply.snippet.publishedAt,
-            likeCount: reply.snippet.likeCount,
-            replyCount: 0
-          });
-        }
-      }
-    }
-
-    pageToken = response.data.nextPageToken;
-    if (!pageToken) break;
-  }
-
-  return comments;
-}
 
 // Store analysis results temporarily
 const analysisCache = new Map();
@@ -497,7 +453,8 @@ app.post('/analyze-comments', async (req, res) => {
     userId = "default",
     maxComments = 100,
     analysisMethod = "gemini",
-    includeReplies = false
+    includeReplies = false,
+    sortBy = "top"
   } = req.body;
   const activeModel = getActiveModel(userId);
   if (activeModel) {
@@ -535,7 +492,7 @@ app.post('/analyze-comments', async (req, res) => {
     
     // Fetch comments
     console.log('💬 Fetching comments...');
-    const comments = await fetchComments(videoId, maxComments, includeReplies);
+    const comments = await fetchComments(videoId, maxComments, includeReplies, sortBy);
 
     console.log(`💬 Fetched ${comments.length} comments`);
 
