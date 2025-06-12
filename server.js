@@ -17,6 +17,10 @@ import {
 
 dotenv.config();
 
+if (process.env.NODE_ENV === "production" && process.env.DEBUG !== "true") {
+  console.log = () => {};
+}
+
 const app = express();
 const port = 3000;
 

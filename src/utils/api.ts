@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { ApiError, AnalysisRequest, AnalysisResult } from '../types';
 import { toast } from 'react-toastify';
+import { log } from './logger';
 
 // Create axios instance with base configuration
 const api: AxiosInstance = axios.create({
@@ -14,7 +15,7 @@ const api: AxiosInstance = axios.create({
 // Request interceptor for adding auth headers or handling requests
 api.interceptors.request.use(
   config => {
-    console.log('🚀 Making API request to:', config.url);
+    log('🚀 Making API request to:', config.url);
     const token = localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -30,7 +31,7 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log('✅ API response received:', response.status);
+    log('✅ API response received:', response.status);
     return response;
   },
   (error: AxiosError) => {
@@ -80,10 +81,10 @@ api.interceptors.response.use(
 
 // API functions
 export const analyzeComments = async (data: AnalysisRequest): Promise<AnalysisResult> => {
-  console.log('📊 Starting comment analysis for:', data.videoId);
+  log('📊 Starting comment analysis for:', data.videoId);
   try {
     const response = await api.post<AnalysisResult>('/analyze-comments', data);
-    console.log('✅ Analysis completed successfully');
+    log('✅ Analysis completed successfully');
     return response.data;
   } catch (error) {
     console.error('❌ Analysis failed:', error);
