@@ -79,17 +79,32 @@ const youtube = google.youtube({
 // Initialize Gemini API key
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Extract the first balanced JSON object from a string
+// Extract the first balanced JSON object or array from a string
 function extractBalancedJson(text) {
-  const start = text.indexOf('{');
+  const braceIndex = text.indexOf('{');
+  const bracketIndex = text.indexOf('[');
+  const start =
+    braceIndex === -1
+      ? bracketIndex
+      : bracketIndex === -1
+        ? braceIndex
+        : Math.min(braceIndex, bracketIndex);
   if (start === -1) return null;
-  let depth = 0;
+
+  const stack = [];
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '{') depth++;
-    if (ch === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+    } else if (ch === '}' || ch === ']') {
+      if (!stack.length) return null;
+      const open = stack.pop();
+      if ((ch === '}' && open !== '{') || (ch === ']' && open !== '[')) {
+        return null;
+      }
+      if (stack.length === 0) {
+        return text.slice(start, i + 1);
+      }
     }
   }
   return null;
@@ -97,27 +112,35 @@ function extractBalancedJson(text) {
 
 // Safely parse JSON and try to remove common issues like trailing commas
 function parseJsonSafe(str) {
-  try {
-    return JSON.parse(str);
-  } catch (err) {
-    const cleaned = str
-      .replace(/```(?:json)?/gi, '') // remove code fences
-      .replace(/;+\s*$/, '') // remove trailing semicolons
-      .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
-      .replace(/[\u0000-\u001F\u007F-\u009F]+/g, ''); // remove control chars
+  const cleaned = str
+    .replace(/```(?:json)?/gi, '') // remove code fences
+    .replace(/;+\s*$/, '') // remove trailing semicolons
+    .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
+    .replace(/[\u0000-\u001F\u007F-\u009F]+/g, ''); // remove control chars
 
+  const attempts = [];
+  const balanced = extractBalancedJson(cleaned);
+  if (balanced) attempts.push(balanced);
+  attempts.push(cleaned);
+
+  for (const text of attempts) {
     try {
-      return JSON.parse(cleaned);
-    } catch (_) {
-      try {
-        // Last resort: use Function to evaluate (handles single quotes)
-        // eslint-disable-next-line no-new-func
-        return Function('return (' + cleaned + ')')();
-      } catch (_) {
-        throw err;
-      }
+      return JSON.parse(text);
+    } catch {
+      // ignore
     }
   }
+
+  for (const text of attempts) {
+    try {
+      // eslint-disable-next-line no-new-func
+      return Function('return (' + text + ')')();
+    } catch {
+      // ignore
+    }
+  }
+
+  throw new Error('Unable to parse JSON');
 }
 
 // Helper function to analyze text with Gemini API for sentiment and toxicity
