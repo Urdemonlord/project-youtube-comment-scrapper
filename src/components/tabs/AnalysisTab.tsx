@@ -11,6 +11,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { useAppStore } from '../../store/appStore';
 import ProgressIndicator from '../ui/ProgressIndicator';
+import ModelUploadWidget from '../widgets/ModelUploadWidget';
 import { debounce } from '../../utils/classNames';
 import { extractVideoId } from '../../utils/validators';
 import { AnalysisSettings } from '../../types';
@@ -473,6 +474,13 @@ const AnalysisTab: React.FC = () => {  const {
               <ProgressIndicator progress={currentProgress} variant="detailed" />
             </motion.div>
           )}
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <ModelUploadWidget />
+          </motion.div>
 
           {/* Tips */}
           <motion.div

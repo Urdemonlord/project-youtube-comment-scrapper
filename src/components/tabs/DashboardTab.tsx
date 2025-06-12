@@ -14,7 +14,6 @@ import StatisticCard from '../ui/StatisticCard';
 import RealtimeChart from '../charts/RealtimeChart';
 import TrendChart from '../charts/TrendChart';
 import MetricsWidget from '../widgets/MetricsWidget';
-import ModelUploadWidget from '../widgets/ModelUploadWidget';
 import ActivityFeed from '../ui/ActivityFeed';
 import { formatNumber, formatPercentage } from '../../utils/classNames';
 
@@ -230,13 +229,6 @@ const DashboardTab: React.FC = () => {
           <MetricsWidget sessions={sessions} />
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.75 }}
-        >
-          <ModelUploadWidget />
-        </motion.div>
       </div>
 
       {/* Active Sessions Monitor */}
