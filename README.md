@@ -110,6 +110,14 @@ Sistem ini menghasilkan berbagai analisis:
 
 Pengguna kini dapat mengunggah model AI pribadi melalui tab Analyze. Setelah diunggah, model dapat diaktifkan atau dihapus sesuai kebutuhan. Sistem akan menggunakan model aktif milik pengguna saat melakukan prediksi.
 
+## 🤝 Kontribusi
+
+Lihat file [CONTRIBUTING.md](CONTRIBUTING.md) untuk panduan berkontribusi. Gunakan pesan commit yang jelas dan deskriptif agar riwayat proyek mudah dipahami, contohnya:
+
+```
+Add keyword-based classifier and tests
+```
+
 ## 📝 Lisensi
 
 MIT License
