@@ -14,6 +14,8 @@ import {
   getActiveModel,
   MODELS_DIR,
 } from './modelManager.js';
+import { fetchComments } from './youtubeFetcher.js';
+import { analyzeWithIndoBert } from './indoBertAnalyzer.js';
 
 dotenv.config();
 
@@ -445,10 +447,28 @@ app.get('/health', (req, res) => {
 
 // Endpoint to analyze YouTube comments
 app.post('/analyze-comments', async (req, res) => {
+  console.log('📊 Starting comment analysis request...');
   const startTime = Date.now();
   
   try {
-    const { videoId, analysisPrompt = '', userId = 'default' } = req.body;
+    const { 
+      videoId, 
+      analysisPrompt = '', 
+      userId = 'default',
+      maxComments = 50,
+      includeReplies = false,
+      sortBy = 'top',
+      analysisMethod = 'gemini'
+    } = req.body;
+    
+    console.log(`📊 Analysis parameters:`, {
+      videoId,
+      maxComments,
+      includeReplies,
+      sortBy,
+      analysisMethod
+    });
+    
     const activeModel = getActiveModel(userId);
     if (activeModel) {
       console.log(`🤖 Using custom model ${activeModel.fileName} for ${userId}`);
@@ -483,24 +503,11 @@ app.post('/analyze-comments', async (req, res) => {
     
     console.log(`📺 Video found: ${video.snippet.title}`);
     
-    // Fetch comments
-    console.log('💬 Fetching comments...');
-    const commentsResponse = await youtube.commentThreads.list({
-      part: ['snippet'],
-      videoId: videoId,
-      maxResults: 20  // Reduced for better performance
-    });
+    // Fetch comments using youtubeFetcher with pagination support
+    console.log(`💬 Fetching ${maxComments} comments (includeReplies: ${includeReplies}, sortBy: ${sortBy})...`);
+    const comments = await fetchComments(videoId, maxComments, includeReplies, sortBy);
 
-    const comments = commentsResponse.data.items.map(item => ({
-      id: item.id,
-      text: item.snippet.topLevelComment.snippet.textDisplay,
-      author: item.snippet.topLevelComment.snippet.authorDisplayName,
-      publishedAt: item.snippet.topLevelComment.snippet.publishedAt,
-      likeCount: item.snippet.topLevelComment.snippet.likeCount,
-      replyCount: item.snippet.totalReplyCount
-    }));
-
-    console.log(`💬 Fetched ${comments.length} comments`);
+    console.log(`💬 Successfully fetched ${comments.length} comments`);
 
     if (comments.length === 0) {
       return res.status(400).json({ 
@@ -509,17 +516,23 @@ app.post('/analyze-comments', async (req, res) => {
       });
     }
 
-    // Analyze with Gemini 2.0 Flash (now includes fallback)
-    console.log('🔄 Starting AI analysis...');
+    // Choose analysis method
+    console.log(`🔄 Starting AI analysis using ${analysisMethod}...`);
     const texts = comments.map(comment => comment.text);
 
     let analysisResult;
     let usingFallback = false;
     
     try {
-      analysisResult = await analyzeWithGemini(texts, analysisPrompt);
+      if (analysisMethod === 'indobert') {
+        console.log('🤖 Using IndoBERT analysis...');
+        analysisResult = await analyzeWithIndoBert(texts);
+      } else {
+        console.log('🤖 Using Gemini analysis...');
+        analysisResult = await analyzeWithGemini(texts, analysisPrompt);
+      }
     } catch (error) {
-      console.warn('⚠️ Gemini analysis completely failed, using fallback...');
+      console.warn('⚠️ Primary analysis failed, using fallback...');
       analysisResult = createFallbackAnalysis(texts);
       usingFallback = true;
     }
@@ -575,13 +588,17 @@ app.post('/analyze-comments', async (req, res) => {
         totalToxicComments: Object.values(analysisResult.toxicity_summary?.category_counts || {}).reduce((a, b) => a + b, 0),
         totalComments,
         percentage: Math.round((Object.values(analysisResult.toxicity_summary?.category_counts || {}).reduce((a, b) => a + b, 0) / totalComments) * 100)
-      },
-      timestamp: new Date().toISOString(),
+      },      timestamp: new Date().toISOString(),
       metadata: {
         usingFallback,
-        analysisMethod: usingFallback ? 'keyword-based' : 'gemini-2.0-flash',
+        analysisMethod: usingFallback ? 'keyword-based' : analysisMethod,
         processingTime: ((Date.now() - startTime) / 1000).toFixed(2) + 's',
-        modelVersion: usingFallback ? 'fallback-v1' : 'gemini-2.0-flash-exp'
+        modelVersion: usingFallback ? 'fallback-v1' : 
+                      analysisMethod === 'indobert' ? 'indobert-base-p1' : 'gemini-2.0-flash-exp',
+        fetchedComments: comments.length,
+        requestedComments: maxComments,
+        includeReplies,
+        sortBy
       }
     };
 

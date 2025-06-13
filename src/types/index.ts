@@ -166,6 +166,7 @@ export interface AnalysisSettings {
   sortBy: 'time' | 'relevance' | 'rating';
   language?: string;
   customPrompt?: string;
+  analysisMethod?: 'gemini' | 'indobert';
   enableSentiment: boolean;
   enableToxicity: boolean;
   enableTopics: boolean;

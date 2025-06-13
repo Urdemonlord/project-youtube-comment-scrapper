@@ -43,12 +43,12 @@ const AnalysisTab: React.FC = () => {  const {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<AnalysisFormData>({
     defaultValues: {
       videoUrl: '',
-      settings: {
-        maxComments: 100,
+      settings: {        maxComments: 100,
         includeReplies: true,
         sortBy: 'relevance',
         language: 'en',
         customPrompt: '',
+        analysisMethod: 'gemini',
         enableSentiment: true,
         enableToxicity: true,
         enableTopics: true,
@@ -146,20 +146,26 @@ const AnalysisTab: React.FC = () => {  const {
 
         // Simulate processing time
         await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // Make actual API call
+      }      // Make actual API call
+      console.log('📊 Sending analysis request with parameters:', {
+        videoId,
+        maxComments: settings.maxComments,
+        includeReplies: settings.includeReplies,
+        sortBy: settings.sortBy,
+        analysisMethod: settings.analysisMethod
+      });
+      
       const response = await fetch('http://localhost:3000/analyze-comments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        },        body: JSON.stringify({
           videoId,
           maxComments: settings.maxComments,
           includeReplies: settings.includeReplies,
           sortBy: settings.sortBy,
           analysisPrompt: settings.customPrompt,
+          analysisMethod: settings.analysisMethod,
         }),
       });
 
@@ -265,19 +271,19 @@ const AnalysisTab: React.FC = () => {  const {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Max Comments
-                  </label>
-                  <select
+                  </label>                  <select
                     {...register('settings.maxComments')}
                     className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                   >
+                    <option value={20}>20 comments</option>
                     <option value={50}>50 comments</option>
                     <option value={100}>100 comments</option>
                     <option value={200}>200 comments</option>
                     <option value={500}>500 comments</option>
+                    <option value={1000}>1000 comments</option>
+                    <option value={2000}>2000 comments</option>
                   </select>
-                </div>
-
-                <div>
+                </div>                <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Sort By
                   </label>
@@ -290,6 +296,23 @@ const AnalysisTab: React.FC = () => {  const {
                     <option value="rating">Top Comments</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Analysis Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Analysis Method
+                </label>
+                <select
+                  {...register('settings.analysisMethod')}
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="gemini">Gemini AI (Recommended)</option>
+                  <option value="indobert">IndoBERT (Indonesian)</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Gemini AI provides comprehensive analysis, IndoBERT is optimized for Indonesian language
+                </p>
               </div>
 
               {/* Analysis Options */}
