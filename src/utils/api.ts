@@ -109,4 +109,14 @@ export const exportToExcel = async (analysisId: string): Promise<Blob> => {
   return response.data;
 };
 
+export const analyzeSentiment = async (
+  comment: string
+): Promise<{ label: string; score: number }> => {
+  const response = await api.post<{ label: string; score: number }>(
+    '/api/sentiment',
+    { comment }
+  );
+  return response.data;
+};
+
 export default api;
