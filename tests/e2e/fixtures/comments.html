@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Comments Test</title>
+</head>
+<body>
+  <ul id="comments">
+    <li data-id="1">
+      <span class="text">I love this video</span>
+      <span class="badge" style="display:none" title="Probability: 90%">☺️</span>
+    </li>
+  </ul>
+  <button id="analyze">Analyze</button>
+  <script>
+    document.getElementById('analyze').addEventListener('click', () => {
+      document.querySelector('#comments li .badge').style.display = 'inline';
+    });
+  </script>
+</body>
+</html>
