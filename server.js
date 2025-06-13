@@ -82,47 +82,112 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Extracts the first balanced JSON object from a string
 function extractBalancedJson(str) {
+  // Try multiple approaches to find JSON
+  const attempts = [];
+  
+  // Method 1: Look for balanced braces
   const start = str.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  for (let i = start; i < str.length; i++) {
-    const char = str[i];
-    if (char === '{') depth++;
-    if (char === '}') {
-      depth--;
-      if (depth === 0) return str.slice(start, i + 1);
+  if (start !== -1) {
+    let depth = 0;
+    for (let i = start; i < str.length; i++) {
+      const char = str[i];
+      if (char === '{') depth++;
+      if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          attempts.push(str.slice(start, i + 1));
+          break;
+        }
+      }
     }
   }
+  
+  // Method 2: Look for JSON between triple backticks
+  const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi;
+  let match;
+  while ((match = codeBlockRegex.exec(str)) !== null) {
+    attempts.push(match[1]);
+  }
+  
+  // Method 3: Look for JSON-like patterns
+  const jsonPatterns = [
+    /(\{[\s\S]*"comments"[\s\S]*\})/gi,
+    /(\{[\s\S]*\})/gi
+  ];
+  
+  for (const pattern of jsonPatterns) {
+    const matches = str.match(pattern);
+    if (matches) {
+      attempts.push(...matches);
+    }
+  }
+  
+  // Return the first valid-looking JSON
+  for (const attempt of attempts) {
+    if (attempt && attempt.trim().startsWith('{') && attempt.trim().endsWith('}')) {
+      return attempt.trim();
+    }
+  }
+  
   return null;
 }
 
 // Safely parse JSON with cleanup and fallback evaluation
 function parseJsonSafe(str) {
+  if (!str || typeof str !== 'string') {
+    throw new Error('Invalid input: string expected');
+  }
+  
   const attempts = [];
+  
+  // Original string
   attempts.push(str);
+  
+  // Cleaned versions
   attempts.push(
     str
       .replace(/```(?:json)?/gi, '') // strip code fences
       .replace(/,\s*(?=[}\]])/g, '') // remove trailing commas
       .replace(/[\u0000-\u001F\u007F-\u009F]+/g, '') // remove control chars
+      .trim()
   );
+  
+  // More aggressive cleaning
+  attempts.push(
+    str
+      .replace(/```(?:json)?/gi, '')
+      .replace(/,\s*(?=[}\]])/g, '')
+      .replace(/[\u0000-\u001F\u007F-\u009F]+/g, '')
+      .replace(/\n/g, ' ')
+      .replace(/\r/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+  
+  // Try parsing with JSON.parse
   for (const attempt of attempts) {
     try {
-      return JSON.parse(attempt);
+      const parsed = JSON.parse(attempt);
+      console.log('✅ JSON.parse succeeded');
+      return parsed;
+    } catch (error) {
+      // Continue to next attempt
+    }
+  }
+  
+  // Try with Function evaluation as fallback
+  for (const attempt of attempts) {
+    try {
+      const result = Function('return (' + attempt + ')')();
+      console.log('✅ Function evaluation succeeded');
+      return result;
     } catch (error) {
       // Continue to next attempt
     }
   }
 
-  for (const attempt of attempts) {
-    try {
-      return Function('return (' + attempt + ')')();
-    } catch (error) {
-      // Continue to next attempt
-    }
-  }
-
-  throw new Error('Unable to parse JSON');
+  throw new Error('Unable to parse JSON from any cleaning attempt');
 }
 
 // Helper function to analyze text with Gemini API for sentiment and toxicity
@@ -151,18 +216,19 @@ async function analyzeWithGemini(texts, analysisPrompt = '') {
           .replace(/http[s]?:\/\/[^\s]*/g, '[URL]') // Replace URLs
           .trim()
       );
-      
-      const batchText = sanitizedTexts.join('\n---COMMENT_SEPARATOR---\n');
+        const batchText = sanitizedTexts.join('\n---COMMENT_SEPARATOR---\n');
       const prompt = `
-Analyze these YouTube comments for sentiment and toxicity. Return valid JSON only.
+IMPORTANT: You must respond with ONLY valid JSON. No explanations, no text before or after the JSON.
+
+Analyze these YouTube comments for sentiment and toxicity. Return the results in exactly this JSON format:
 
 {
   "comments": [
     {
       "text": "exact comment text",
-      "sentiment": number between -1 and 1,
+      "sentiment": -1.0,
       "toxicity": {
-        "overall": number between 0 and 1,
+        "overall": 0.1,
         "categories": {
           "identity_attack": 0.1,
           "insult": 0.1,
@@ -178,7 +244,7 @@ Analyze these YouTube comments for sentiment and toxicity. Return valid JSON onl
     }
   ],
   "overall_sentiment": {
-    "score": 0,
+    "score": 0.0,
     "distribution": { "very_negative": 0, "negative": 0, "neutral": 1, "positive": 0, "very_positive": 0 }
   },
   "toxicity_summary": {
@@ -186,18 +252,16 @@ Analyze these YouTube comments for sentiment and toxicity. Return valid JSON onl
     "distribution": { "low": 1, "medium": 0, "high": 0, "severe": 0 },
     "category_counts": { "identity_attack": 0, "insult": 0, "obscene": 0, "severe_toxicity": 0, "sexual_explicit": 0, "threat": 0 }
   },
-  "topics": [{ "name": "general discussion", "count": 1, "sentiment": 0 }],
-  "keywords": [{ "word": "comment", "count": 1, "sentiment": 0 }]
+  "topics": [{ "name": "general discussion", "count": 1, "sentiment": 0.0 }],
+  "keywords": [{ "word": "comment", "count": 1, "sentiment": 0.0 }]
 }
 
 Additional context: ${analysisPrompt}
 
-Comments:
+Analyze these comments and respond with ONLY the JSON object:
 ${batchText}
-`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000); // Reduced timeout
+`;      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased timeout to 60 seconds
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
@@ -211,12 +275,13 @@ ${batchText}
               {
                 parts: [{ text: prompt }]
               }
-            ],
-            generationConfig: {
-              temperature: 0.3, // Slightly higher for variation
-              topK: 20,
-              topP: 0.8,
-              maxOutputTokens: 4096, // Reduced for faster response
+            ],            generationConfig: {
+              temperature: 0.1, // Lower temperature for more consistent JSON output
+              topK: 10,
+              topP: 0.5,
+              maxOutputTokens: 8192, // Increased for larger comment batches
+              candidateCount: 1, // Ensure single response
+              stopSequences: [] // No stop sequences to avoid cutting off JSON
             }
           }),
           signal: controller.signal
@@ -240,11 +305,12 @@ ${batchText}
           throw new Error(`Gemini API returned ${response.status}: ${JSON.stringify(data)}`);
         }
       }
-      
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
         const responseText = data.candidates[0].content.parts[0].text;
-        console.log('📝 Raw Gemini Response:', responseText.substring(0, 300) + '...');
-            try {
+        console.log('📝 Raw Gemini Response Length:', responseText.length);
+        console.log('📝 Raw Gemini Response Preview:', responseText.substring(0, 500) + '...');
+        
+        try {
           // Clean up the response text
           const cleanText = responseText
             .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
@@ -254,17 +320,28 @@ ${batchText}
             .replace(/<[^>]*>/g, '') // Remove remaining HTML tags
             .replace(/http[s]?:\/\/[^\s]*/g, '[URL]'); // Replace URLs
 
-          // Try to extract JSON using balanced braces
+          console.log('🧹 Cleaned Response Preview:', cleanText.substring(0, 500) + '...');
+
+          // Try to extract JSON using improved extraction
           const jsonStr = extractBalancedJson(cleanText);
+          console.log('🔍 JSON Extraction Result:', jsonStr ? 'Found' : 'Not Found');
+          
           if (jsonStr) {
-            console.log('🔍 Cleaned JSON:', jsonStr.substring(0, 200) + '...');
+            console.log('� Extracted JSON Preview:', jsonStr.substring(0, 300) + '...');
             
             const parsedData = parseJsonSafe(jsonStr);
             
             // Validate required fields
+            if (!parsedData) {
+              throw new Error('Parsed data is null or undefined');
+            }
+            
             if (!parsedData.comments || !Array.isArray(parsedData.comments)) {
+              console.error('❌ Invalid response structure. Got:', Object.keys(parsedData));
               throw new Error('Invalid response structure: missing comments array');
             }
+            
+            console.log('✅ Validation passed. Comments found:', parsedData.comments.length);
             
             // Clean up comment texts
             parsedData.comments = parsedData.comments.map(comment => ({
@@ -277,9 +354,24 @@ ${batchText}
             }));
             
             console.log('✅ Successfully parsed and validated Gemini response');
-            return parsedData;
-          } else {
+            return parsedData;          } else {
             console.error('❌ No valid JSON found in cleaned response');
+            console.error('📝 Response for debugging:', cleanText.substring(0, 1000));
+            
+            // Last resort: try to create analysis from partial response
+            if (cleanText.length > 50) {
+              console.log('🔄 Attempting to salvage partial response...');
+              try {
+                const partialAnalysis = createPartialAnalysisFromText(texts, cleanText);
+                if (partialAnalysis) {
+                  console.log('✅ Partial analysis created successfully');
+                  return partialAnalysis;
+                }
+              } catch (salvageError) {
+                console.warn('⚠️ Could not salvage partial response:', salvageError.message);
+              }
+            }
+            
             throw new Error('No valid JSON found in cleaned response');
           }
         } catch (parseError) {
@@ -336,6 +428,104 @@ function createFallbackAnalysis(texts) {
       // Simple toxicity calculation
       const toxicCount = toxicKeywords.filter(word => lowerText.includes(word)).length;
       const toxicityScore = Math.min(toxicCount * 0.3, 0.8);
+      
+      return {
+        text,
+        sentiment,
+        toxicity: {
+          overall: toxicityScore,
+          categories: {
+            identity_attack: toxicityScore > 0.5 ? 0.3 : 0.1,
+            insult: toxicityScore > 0.3 ? 0.4 : 0.1,
+            obscene: lowerText.includes('shit') || lowerText.includes('fuck') ? 0.6 : 0.1,
+            severe_toxicity: toxicityScore > 0.7 ? 0.3 : 0.1,
+            sexual_explicit: 0.1,
+            threat: lowerText.includes('kill') || lowerText.includes('die') ? 0.5 : 0.1,
+            toxicity: toxicityScore
+          },
+          confidence: 0.6
+        },
+        categories: toxicityScore > 0.3 ? ['potentially toxic'] : ['general']
+      };
+    }),
+    overall_sentiment: {
+      score: texts.reduce((sum, text) => {
+        const lowerText = text.toLowerCase();
+        const positiveCount = positiveKeywords.filter(word => lowerText.includes(word)).length;
+        const negativeCount = negativeKeywords.filter(word => lowerText.includes(word)).length;
+        return sum + (positiveCount > negativeCount ? 0.3 : negativeCount > positiveCount ? -0.3 : 0);
+      }, 0) / texts.length,
+      distribution: {
+        very_negative: Math.floor(texts.length * 0.1),
+        negative: Math.floor(texts.length * 0.2),
+        neutral: Math.floor(texts.length * 0.4),
+        positive: Math.floor(texts.length * 0.2),
+        very_positive: Math.floor(texts.length * 0.1)
+      }
+    },
+    toxicity_summary: {
+      average_score: 0.25,
+      distribution: {
+        low: Math.floor(texts.length * 0.7),
+        medium: Math.floor(texts.length * 0.2),
+        high: Math.floor(texts.length * 0.1),
+        severe: 0
+      },
+      category_counts: {
+        identity_attack: Math.floor(texts.length * 0.05),
+        insult: Math.floor(texts.length * 0.15),
+        obscene: Math.floor(texts.length * 0.1),
+        severe_toxicity: Math.floor(texts.length * 0.02),
+        sexual_explicit: Math.floor(texts.length * 0.03),
+        threat: Math.floor(texts.length * 0.01)
+      }
+    },
+    topics: [
+      { name: "general discussion", count: Math.floor(texts.length * 0.6), sentiment: 0 },
+      { name: "reactions", count: Math.floor(texts.length * 0.4), sentiment: 0.1 }
+    ],
+    keywords: [
+      { word: "video", count: Math.floor(texts.length * 0.3), sentiment: 0.1 },
+      { word: "good", count: Math.floor(texts.length * 0.2), sentiment: 0.5 },
+      { word: "comment", count: texts.length, sentiment: 0 }
+    ]
+  };
+}
+
+// Helper function to create partial analysis when JSON parsing fails but response contains useful text
+function createPartialAnalysisFromText(texts, responseText) {
+  console.log('🔄 Creating partial analysis from response text...');
+  
+  // Simple keyword-based analysis similar to fallback but try to extract some info from response
+  const toxicKeywords = ['hate', 'stupid', 'idiot', 'trash', 'terrible', 'awful', 'worst', 'sucks', 'bad', 'damn', 'shit', 'fuck'];
+  const positiveKeywords = ['good', 'great', 'awesome', 'amazing', 'love', 'best', 'fantastic', 'excellent', 'wonderful', 'perfect'];
+  const negativeKeywords = ['bad', 'hate', 'terrible', 'awful', 'worst', 'horrible', 'disgusting', 'annoying', 'boring'];
+  
+  // Try to extract sentiment hints from the response text
+  const responseLower = responseText.toLowerCase();
+  const responseHasPositive = positiveKeywords.some(word => responseLower.includes(word));
+  const responseHasNegative = negativeKeywords.some(word => responseLower.includes(word));
+  const responseHasToxic = toxicKeywords.some(word => responseLower.includes(word));
+  
+  return {
+    comments: texts.map(text => {
+      const lowerText = text.toLowerCase();
+      
+      // Enhanced sentiment calculation using both text and response hints
+      const positiveCount = positiveKeywords.filter(word => lowerText.includes(word)).length;
+      const negativeCount = negativeKeywords.filter(word => lowerText.includes(word)).length;
+      let sentiment = positiveCount > negativeCount ? 0.3 : negativeCount > positiveCount ? -0.3 : 0;
+      
+      // Adjust sentiment based on response hints
+      if (responseHasPositive && sentiment === 0) sentiment = 0.1;
+      if (responseHasNegative && sentiment === 0) sentiment = -0.1;
+      
+      // Enhanced toxicity calculation
+      const toxicCount = toxicKeywords.filter(word => lowerText.includes(word)).length;
+      let toxicityScore = Math.min(toxicCount * 0.3, 0.8);
+      
+      // Adjust toxicity based on response hints
+      if (responseHasToxic && toxicityScore < 0.2) toxicityScore = 0.3;
       
       return {
         text,
