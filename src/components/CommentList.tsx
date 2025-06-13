@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Comment } from '../types';
 import { ThumbsUp, MessageSquare, Clock, ChevronDown, ChevronUp, Filter, AlertTriangle, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import SentimentBadge from './ui/SentimentBadge';
 
 interface CommentListProps {
   comments: Comment[];
@@ -55,12 +56,14 @@ const CommentList: React.FC<CommentListProps> = ({ comments }) => {
     return { icon: Shield, color: 'text-green-500', label: 'Safe' };
   };
 
-  // Get sentiment indicator
-  const getSentimentIndicator = (sentiment?: number) => {
+  // Get sentiment label for SentimentBadge
+  const getSentimentLabel = (
+    sentiment?: number
+  ): 'positive' | 'neutral' | 'negative' | null => {
     if (sentiment === undefined) return null;
-    if (sentiment > 0.2) return { emoji: '😊', color: 'text-green-600', label: 'Positive' };
-    if (sentiment < -0.2) return { emoji: '😞', color: 'text-red-600', label: 'Negative' };
-    return { emoji: '😐', color: 'text-gray-600', label: 'Neutral' };
+    if (sentiment > 0.2) return 'positive';
+    if (sentiment < -0.2) return 'negative';
+    return 'neutral';
   };
 
   return (
@@ -121,12 +124,10 @@ const CommentList: React.FC<CommentListProps> = ({ comments }) => {
                   
                   {/* Sentiment Indicator */}
                   {(() => {
-                    const sentimentInfo = getSentimentIndicator(comment.sentiment);
-                    if (sentimentInfo) {
+                    const computedLabel = getSentimentLabel(comment.sentimentScore);
+                    if (computedLabel) {
                       return (
-                        <span className={`text-sm ${sentimentInfo.color}`} title={`Sentiment: ${sentimentInfo.label}`}>
-                          {sentimentInfo.emoji}
-                        </span>
+                        <SentimentBadge label={computedLabel} score={comment.sentimentScore!} />
                       );
                     }
                     return null;
