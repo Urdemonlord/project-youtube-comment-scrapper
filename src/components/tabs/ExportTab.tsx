@@ -16,9 +16,10 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { 
-  generateCSV, 
-  generateJSON, 
-  generateExcelData, 
+  generateCSV,
+  generateMLCSV,
+  generateJSON,
+  generateExcelData,
   generateTextReport,
   downloadFile,
   generateFilename,
@@ -65,7 +66,7 @@ const formatDateTime = (date: Date | string | number | null | undefined): string
 
 interface ExportJob {
   id: string;
-  type: 'csv' | 'excel' | 'json' | 'text' | 'pdf';
+  type: 'csv' | 'mlcsv' | 'excel' | 'json' | 'text' | 'pdf';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   sessionIds: string[];
   createdAt: Date;
@@ -167,6 +168,13 @@ const ExportTab: React.FC = () => {
         case 'csv':
           filename = generateFilename('csv', 'youtube-analysis');
           content = generateCSV(exportData);
+          mimeType = 'text/csv;charset=utf-8;';
+          updateProgress(80);
+          break;
+
+        case 'mlcsv':
+          filename = generateFilename('csv', 'youtube-ml-data');
+          content = generateMLCSV(exportData);
           mimeType = 'text/csv;charset=utf-8;';
           updateProgress(80);
           break;
@@ -317,16 +325,23 @@ const ExportTab: React.FC = () => {
       {/* Export Options */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { 
-            id: 'csv', 
-            name: 'CSV Export', 
-            icon: FileSpreadsheet, 
+          {
+            id: 'csv',
+            name: 'CSV Export',
+            icon: FileSpreadsheet,
             description: 'Comma-separated values for data analysis',
             color: 'green'
           },
-          { 
-            id: 'excel', 
-            name: 'Excel Workbook', 
+          {
+            id: 'mlcsv',
+            name: 'ML CSV',
+            icon: FileSpreadsheet,
+            description: 'Dataset with comment text and labels',
+            color: 'indigo'
+          },
+          {
+            id: 'excel',
+            name: 'Excel Workbook',
             icon: Database, 
             description: 'Full Excel file with multiple sheets',
             color: 'blue'

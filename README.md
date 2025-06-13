@@ -33,7 +33,7 @@ Aplikasi ini dikembangkan sebagai bagian dari penelitian skripsi untuk menganali
 - AI Processing: Google Gemini API
 - Data Source: YouTube Data API v3
 - Visualisasi: React Charts
-- Export Data: Excel
+- Export Data: Excel & CSV
 
 ### Fitur Utama
 
@@ -56,7 +56,11 @@ Aplikasi ini dikembangkan sebagai bagian dari penelitian skripsi untuk menganali
 
 4. **Export Data**
    - Format Excel untuk analisis lanjutan
+   - Dataset CSV (komentar & label) untuk machine learning
    - Laporan terstruktur
+
+Gunakan tombol **Export ML Data (CSV)** di halaman hasil analisis untuk
+mengunduh dataset komentar lengkap beserta label sentimen dan skor toksisitas.
 
 ## 💻 Panduan Instalasi
 
@@ -103,7 +107,7 @@ Sistem ini menghasilkan berbagai analisis:
 - Deteksi tingkat toksisitas
 - Ekstraksi kata kunci penting
 - Visualisasi data interaktif
-- Export data untuk analisis lanjut
+ - Export data (Excel/CSV) untuk analisis lanjut atau pelatihan model
 
 ### 🚀 Custom Model Upload
 ### 🔤 Mode IndoBERT

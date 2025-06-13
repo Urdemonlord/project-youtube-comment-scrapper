@@ -1,5 +1,6 @@
 // Export Utilities for YouTube Comment Analyzer
 import type { ScrapingSession, AnalysisResult } from '../types';
+import { exportToML, convertToCSV, type MLExportData } from './csvExport';
 
 export interface ExportData {
   sessions: ScrapingSession[];
@@ -225,6 +226,17 @@ For more detailed analysis, use the Excel or CSV export options.
 `;
 
   return report.trim();
+};
+
+// ML CSV Generator - export all comments with text and labels
+export const generateMLCSV = (data: ExportData): string => {
+  const rows: MLExportData[] = [];
+  data.sessions.forEach(session => {
+    if (session.result) {
+      rows.push(...exportToML(session.result));
+    }
+  });
+  return convertToCSV(rows);
 };
 
 // File Download Utility
