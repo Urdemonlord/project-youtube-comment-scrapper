@@ -15,7 +15,6 @@ import {
   MODELS_DIR,
 } from './modelManager.js';
 import { fetchComments } from './youtubeFetcher.js';
-import { analyzeWithIndoBert } from './indoBertAnalyzer.js';
 
 dotenv.config();
 
@@ -522,11 +521,19 @@ app.post('/analyze-comments', async (req, res) => {
 
     let analysisResult;
     let usingFallback = false;
-    
-    try {
+      try {
       if (analysisMethod === 'indobert') {
-        console.log('🤖 Using IndoBERT analysis...');
-        analysisResult = await analyzeWithIndoBert(texts);
+        console.log('🤖 Attempting IndoBERT analysis...');
+        try {
+          const { analyzeWithIndoBert } = await import('./indoBertAnalyzer.js');
+          analysisResult = await analyzeWithIndoBert(texts);
+          console.log('✅ IndoBERT analysis successful');
+        } catch (indoBertError) {
+          console.warn('⚠️ IndoBERT analysis failed:', indoBertError.message);
+          console.log('🔄 Falling back to Gemini analysis...');
+          analysisResult = await analyzeWithGemini(texts, analysisPrompt);
+          usingFallback = true;
+        }
       } else {
         console.log('🤖 Using Gemini analysis...');
         analysisResult = await analyzeWithGemini(texts, analysisPrompt);

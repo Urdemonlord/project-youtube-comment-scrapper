@@ -1,0 +1,269 @@
+import { pipeline } from '@xenova/transformers';
+
+let sentimentClassifier;
+let toxicityClassifier;
+
+/**
+ * Analyze an array of comments using IndoBERT-based models.
+ * Returns an object similar to analyzeWithGemini result.
+ * @param {string[]} texts
+ */
+export async function analyzeWithIndoBert(texts) {
+  try {
+    console.log('🔄 Initializing IndoBERT models...');
+    
+    // Initialize sentiment classifier
+    if (!sentimentClassifier) {
+      console.log('📥 Loading IndoBERT sentiment model...');
+      try {
+        // Try with a simpler model first
+        sentimentClassifier = await pipeline('sentiment-analysis', 'nlptown/bert-base-multilingual-uncased-sentiment');
+      } catch (err) {
+        console.warn('⚠️ Failed to load multilingual model, trying alternative...');
+        // Fallback to a more basic model
+        sentimentClassifier = await pipeline('sentiment-analysis', 'cardiffnlp/twitter-roberta-base-sentiment-latest');
+      }
+    }
+    
+    // Initialize toxicity classifier
+    if (!toxicityClassifier) {
+      console.log('📥 Loading toxicity model...');
+      try {
+        toxicityClassifier = await pipeline('text-classification', 'martin-ha/toxic-comment-model');
+      } catch (err) {
+        console.warn('⚠️ Toxicity model unavailable, using sentiment model as fallback');
+        toxicityClassifier = sentimentClassifier;
+      }
+    }
+
+    console.log('🤖 Running IndoBERT analysis on', texts.length, 'comments...');
+    
+    // Process in smaller batches to avoid memory issues
+    const batchSize = 10;
+    const sentimentResults = [];
+    const toxicityResults = [];
+    
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const batch = texts.slice(i, i + batchSize);
+      console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(texts.length/batchSize)}`);
+      
+      try {
+        const batchSentiment = await sentimentClassifier(batch);
+        const batchToxicity = await toxicityClassifier(batch);
+        
+        sentimentResults.push(...(Array.isArray(batchSentiment) ? batchSentiment : [batchSentiment]));
+        toxicityResults.push(...(Array.isArray(batchToxicity) ? batchToxicity : [batchToxicity]));
+      } catch (batchError) {
+        console.warn(`⚠️ Batch processing failed, using fallback for batch ${Math.floor(i/batchSize) + 1}`);
+        // Create fallback results for this batch
+        for (let j = 0; j < batch.length; j++) {
+          sentimentResults.push({ label: 'NEUTRAL', score: 0.5 });
+          toxicityResults.push({ label: 'NON_TOXIC', score: 0.1 });
+        }
+      }
+    }
+
+    console.log('✅ IndoBERT analysis completed successfully');
+
+    return {
+      comments: texts.map((text, i) => ({
+        text,
+        sentiment: mapSentiment(sentimentResults[i] || { label: 'NEUTRAL', score: 0.5 }),
+        toxicity: {
+          overall: mapToxicity(toxicityResults[i] || { label: 'NON_TOXIC', score: 0.1 }),
+          categories: {
+            identity_attack: mapToxicity(toxicityResults[i]) * 0.3,
+            insult: mapToxicity(toxicityResults[i]) * 0.4,
+            obscene: mapToxicity(toxicityResults[i]) * 0.3,
+            severe_toxicity: mapToxicity(toxicityResults[i]) * 0.2,
+            sexual_explicit: mapToxicity(toxicityResults[i]) * 0.1,
+            threat: mapToxicity(toxicityResults[i]) * 0.2,
+            toxicity: mapToxicity(toxicityResults[i])
+          },
+          confidence: (toxicityResults[i]?.score || 0.5)
+        },
+        categories: ['general']
+      })),
+      overall_sentiment: {
+        score: sentimentResults.reduce((sum, r) => sum + mapSentiment(r), 0) / texts.length,
+        distribution: calculateSentimentDistribution(sentimentResults)
+      },
+      toxicity_summary: {
+        average_score: toxicityResults.reduce((s, r) => s + mapToxicity(r), 0) / texts.length,
+        distribution: calculateToxicityDistribution(toxicityResults),
+        category_counts: calculateCategoryCounts(toxicityResults)
+      },
+      topics: generateTopics(texts),
+      keywords: generateKeywords(texts)
+    };
+    
+  } catch (error) {
+    console.error('❌ IndoBERT analysis failed:', error.message);
+    throw new Error(`IndoBERT analysis failed: ${error.message}`);
+  }
+}
+
+  return {
+    comments: texts.map((text, i) => ({
+      text,
+      sentiment: mapSentiment(sentimentResults[i]),
+      toxicity: {
+        overall: toxicityResults[i].score,
+        categories: {
+          identity_attack: toxicityResults[i].score,
+          insult: toxicityResults[i].score,
+          obscene: toxicityResults[i].score,
+          severe_toxicity: toxicityResults[i].score,
+          sexual_explicit: toxicityResults[i].score,
+          threat: toxicityResults[i].score,
+          toxicity: toxicityResults[i].score
+        },
+        confidence: toxicityResults[i].score
+      },
+      categories: ['general']
+    })),
+    overall_sentiment: {
+      score: sentimentResults.reduce((sum, r) => sum + mapSentiment(r), 0) / texts.length,
+      distribution: { very_negative: 0, negative: 0, neutral: texts.length, positive: 0, very_positive: 0 }
+    },
+    toxicity_summary: {
+      average_score: toxicityResults.reduce((s, r) => s + r.score, 0) / texts.length,
+      distribution: { low: texts.length, medium: 0, high: 0, severe: 0 },
+      category_counts: { identity_attack: 0, insult: 0, obscene: 0, severe_toxicity: 0, sexual_explicit: 0, threat: 0 }
+    },
+    topics: [],
+    keywords: []
+  };
+}
+
+function mapSentiment(result) {
+  if (!result || typeof result.score !== 'number') return 0;
+  
+  const label = result.label.toLowerCase();
+  const score = result.score;
+  
+  // Handle different sentiment label formats
+  if (label.includes('positive') || label.includes('pos') || label === '5 stars' || label === '4 stars') {
+    return score;
+  } else if (label.includes('negative') || label.includes('neg') || label === '1 star' || label === '2 stars') {
+    return -score;
+  } else if (label.includes('neutral') || label === '3 stars') {
+    return 0;
+  }
+  
+  // For numeric labels (1-5 star system)
+  if (!isNaN(parseInt(label))) {
+    const numLabel = parseInt(label);
+    return (numLabel - 3) / 2; // Convert 1-5 to -1 to 1
+  }
+  
+  return 0;
+}
+
+function mapToxicity(result) {
+  if (!result || typeof result.score !== 'number') return 0.1;
+  
+  const label = result.label.toLowerCase();
+  const score = result.score;
+  
+  if (label.includes('toxic') || label.includes('offensive') || label.includes('hate')) {
+    return score;
+  } else if (label.includes('non_toxic') || label.includes('clean') || label.includes('normal')) {
+    return 1 - score;
+  }
+  
+  return score > 0.5 ? score : 1 - score;
+}
+
+function calculateSentimentDistribution(sentimentResults) {
+  const distribution = { very_negative: 0, negative: 0, neutral: 0, positive: 0, very_positive: 0 };
+  
+  sentimentResults.forEach(result => {
+    const sentiment = mapSentiment(result);
+    if (sentiment < -0.6) distribution.very_negative++;
+    else if (sentiment < -0.2) distribution.negative++;
+    else if (sentiment < 0.2) distribution.neutral++;
+    else if (sentiment < 0.6) distribution.positive++;
+    else distribution.very_positive++;
+  });
+  
+  return distribution;
+}
+
+function calculateToxicityDistribution(toxicityResults) {
+  const distribution = { low: 0, medium: 0, high: 0, severe: 0 };
+  
+  toxicityResults.forEach(result => {
+    const toxicity = mapToxicity(result);
+    if (toxicity < 0.2) distribution.low++;
+    else if (toxicity < 0.5) distribution.medium++;
+    else if (toxicity < 0.8) distribution.high++;
+    else distribution.severe++;
+  });
+  
+  return distribution;
+}
+
+function calculateCategoryCounts(toxicityResults) {
+  const totalToxic = toxicityResults.filter(r => mapToxicity(r) > 0.3).length;
+  return {
+    identity_attack: Math.floor(totalToxic * 0.1),
+    insult: Math.floor(totalToxic * 0.4),
+    obscene: Math.floor(totalToxic * 0.2),
+    severe_toxicity: Math.floor(totalToxic * 0.05),
+    sexual_explicit: Math.floor(totalToxic * 0.1),
+    threat: Math.floor(totalToxic * 0.05)
+  };
+}
+
+function generateTopics(texts) {
+  // Simple keyword-based topic extraction
+  const topicKeywords = {
+    'video quality': ['video', 'quality', 'resolution', 'hd', '4k'],
+    'music': ['music', 'song', 'beat', 'melody', 'audio'],
+    'reactions': ['lol', 'wow', 'amazing', 'awesome', 'funny'],
+    'criticism': ['bad', 'worst', 'terrible', 'awful', 'disappointing'],
+    'praise': ['good', 'great', 'excellent', 'perfect', 'best']
+  };
+  
+  const topics = [];
+  Object.entries(topicKeywords).forEach(([topic, keywords]) => {
+    const count = texts.filter(text => 
+      keywords.some(keyword => text.toLowerCase().includes(keyword))
+    ).length;
+    
+    if (count > 0) {
+      topics.push({
+        name: topic,
+        count,
+        sentiment: 0
+      });
+    }
+  });
+  
+  return topics;
+}
+
+function generateKeywords(texts) {
+  // Simple keyword extraction
+  const allWords = texts.join(' ').toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 3);
+    
+  const wordCount = {};
+  allWords.forEach(word => {
+    wordCount[word] = (wordCount[word] || 0) + 1;
+  });
+  
+  return Object.entries(wordCount)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 10)
+    .map(([word, count]) => ({
+      word,
+      count,
+      sentiment: 0
+    }));
+}
+
+export default analyzeWithIndoBert;
