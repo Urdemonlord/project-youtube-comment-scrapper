@@ -113,6 +113,29 @@ Sistem ini menghasilkan berbagai analisis:
 ### 🔤 Mode IndoBERT
 Aktifkan analisis IndoBERT dengan mengirim parameter `analysisMethod: "indobert"` pada endpoint `/analyze-comments`. Pastikan paket `@xenova/transformers` telah terpasang.
 
+### ✦ Fitur Sentimen
+Gunakan endpoint baru `POST /api/sentiment` untuk menganalisis sentimen satu komentar.
+Jika variabel lingkungan `HUGGINGFACE_API_TOKEN` diisi, server akan mengunduh
+model IndoBERT dari HuggingFace dan menjalankan inferensi secara lokal.
+Tanpa token tersebut, teks dikirim ke HuggingFace Inference API.
+
+Aktifkan opsi **Sentiment Analysis** di form Analisis atau kirim
+`enableSentiment: true` pada body `/analyze-comments` untuk menyertakan hasil
+sentimen dalam analisis video.
+
+```bash
+curl -X POST http://localhost:3000/api/sentiment \
+  -H 'Content-Type: application/json' \
+  -d '{"comment":"Saya suka videonya"}'
+```
+
+```mermaid
+graph LR
+  A[Client] -- POST /api/sentiment --> B(Server)
+  B -- local model / API --> C[HuggingFace]
+  C --> B --> A
+```
+
 ### API Usage
 Gunakan parameter `includeReplies` pada endpoint `/analyze-comments` untuk menyertakan balasan komentar. Nilai default adalah `false`. Jika diatur ke `true`, setiap reply akan dihitung sebagai komentar tersendiri hingga batas `maxComments` tercapai.
 
