@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { pipeline } from '@xenova/transformers';
+import LRUCache from 'lru-cache';
 
 export interface SentimentResult {
   label: string;
@@ -10,28 +11,18 @@ export interface SentimentResult {
 const API_URL = 'https://api-inference.huggingface.co/models/indobenchmark/indobertweet-base-p1';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-interface CacheEntry {
-  result: SentimentResult;
-  expires: number;
-}
-
-const cache = new Map<string, CacheEntry>();
+const cache = new LRUCache<string, SentimentResult>({
+  max: 100,
+  ttl: CACHE_TTL
+});
 let localPipelinePromise: Promise<(text: string) => Promise<any>> | null = null;
 
 function cacheGet(text: string): SentimentResult | undefined {
-  const entry = cache.get(text);
-  const now = Date.now();
-  if (entry && entry.expires > now) {
-    return entry.result;
-  }
-  if (entry) {
-    cache.delete(text);
-  }
-  return undefined;
+  return cache.get(text);
 }
 
 function cacheSet(text: string, result: SentimentResult): void {
-  cache.set(text, { result, expires: Date.now() + CACHE_TTL });
+  cache.set(text, result);
 }
 
 function hasLocalModel(): boolean {
