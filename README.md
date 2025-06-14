@@ -82,8 +82,15 @@ cp .env.example .env
 Edit file .env dengan API keys:
 - YouTube API key dari [Google Cloud Console](https://console.cloud.google.com)
 - Gemini API key dari [Google AI Studio](https://makersuite.google.com/app/apikey)
+- HUGGINGFACE_API_TOKEN (opsional) untuk mengunduh model IndoBERT
 
-4. Jalankan aplikasi:
+4. (Opsional) Ekspor model IndoBERT ke ONNX:
+```bash
+python export_to_onnx.py
+```
+Salin folder hasil ekspor ke `models/indobertweet-base-p1`.
+
+5. Jalankan aplikasi:
 ```bash
 # Terminal 1: Backend
 npm run server
